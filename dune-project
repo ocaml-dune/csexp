@@ -8,21 +8,25 @@
   "Jane Street Group, LLC <opensource@janestreet.com>"
   "Jeremie Dimino <jeremie@dimino.org>")
 (source (github ocaml/dune))
-(documentation "https://dune.readthedocs.io/")
 
 (generate_opam_files true)
 
 (package
  (name csexp)
- (synopsis "Parsing and printing of Canonical S-expressions")
+ (synopsis "Parsing and printing of S-expressions in Canonical form")
  (description "
 This library provides minimal support for Canonical S-expressions
-[1]. Canonical S-expressions, or csexp for short are a binary encoding
-of s-expressions that is super simple and well suited for
-communication between programs.
+[1]. Canonical S-expressions are a binary encoding of S-expressions
+that is super simple and well suited for communication between
+programs.
 
-The library provides a fully generic parser that can be used with any
-kind of inputs or s-expression types as well as a generic serialiser.
+This library only provides a few helpers for simple applications. If
+you need more advanced support, such as parsing from more fancy input
+sources, you should consider copying the code of this library given
+how simple parsing S-expressions in canonical form is.
+
+To avoid a dependency on a particular S-expression library, the only
+module of this library is parameterised by the type of S-expressions.
 
 [1] https://en.wikipedia.org/wiki/Canonical_S-expressions
 "))

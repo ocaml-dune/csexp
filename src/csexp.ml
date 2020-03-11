@@ -1,96 +1,194 @@
-open Result.O
+module type Sexp = sig
+  type t =
+    | Atom of string
+    | List of t list
+end
 
-let ok = Result.ok
+module Make (Sexp : Sexp) = struct
+  open Sexp
 
-type t = Sexp.t
+  module type Input = sig
+    type t
 
-let peek s =
-  match Stream.peek s with
-  | Some v -> ok v
-  | None -> Error "unexpected end of file"
+    val read_string : t -> int -> string
 
-let read_string s l =
-  let res = Bytes.make l ' ' in
-  let rec read = function
-    | v when v = l -> ()
-    | v ->
-      BytesLabels.set res v (Stream.next s);
-      read (v + 1)
-  in
-  try
-    read 0;
-    ok (Bytes.to_string res)
-  with Stream.Failure ->
-    Error (Printf.sprintf "unexpected end of file in atom of size %i" l)
+    val read_char : t -> char
+  end
 
-let parse stream =
-  let rec read_size acc =
-    let c = Stream.next stream in
-    if c = ':' then
-      ok acc
-    else
-      let idx = int_of_char c - int_of_char '0' in
-      if idx < 0 || idx > 9 then
-        Error (Printf.sprintf "invalid character in size: %c" c)
+  exception Parse_error of string
+
+  let parse_error msg = raise_notrace (Parse_error msg)
+
+  let invalid_character () = parse_error "invalid character"
+
+  let missing_left_parenthesis () =
+    parse_error "right parenthesis without matching left parenthesis"
+
+  module Make_parser (Input : Input) = struct
+    let int_of_digit c = Char.code c - Char.code '0'
+
+    let rec parse_atom input len =
+      match Input.read_char input with
+      | '0' .. '9' as c ->
+        let len = (len * 10) + int_of_digit c in
+        if len > Sys.max_string_length then
+          parse_error "atom too big to represent"
+        else
+          parse_atom input len
+      | ':' ->
+        let s = Input.read_string input len in
+        Atom s
+      | _ -> invalid_character ()
+
+    let rec parse_many input depth acc =
+      match Input.read_char input with
+      | '(' ->
+        let sexps = parse_many input (depth + 1) [] in
+        parse_many input (depth + 1) (List sexps :: acc)
+      | ')' ->
+        if depth = 0 then
+          missing_left_parenthesis ()
+        else
+          List.rev acc
+      | '0' .. '9' as c ->
+        let sexp = parse_atom input (int_of_digit c) in
+        parse_many input depth (sexp :: acc)
+      | _ -> invalid_character ()
+
+    let parse_one input =
+      match Input.read_char input with
+      | '(' ->
+        let sexps = parse_many input 1 [] in
+        List sexps
+      | ')' -> missing_left_parenthesis ()
+      | '0' .. '9' as c -> parse_atom input (int_of_digit c)
+      | _ -> invalid_character ()
+  end
+  [@@inlined always]
+
+  let premature_end = "premature end of input"
+
+  module String_input = struct
+    type t =
+      { buf : string
+      ; mutable pos : int
+      }
+
+    let read_string t len =
+      let pos = t.pos in
+      let s = String.sub t.buf pos len in
+      t.pos <- pos + len;
+      s
+
+    let read_char t =
+      let pos = t.pos in
+      let c = t.buf.[pos] in
+      t.pos <- pos + 1;
+      c
+
+    let error_of_exn t = function
+      | Parse_error msg -> Error (t.pos, msg)
+      | _ -> Error (t.pos, premature_end)
+  end
+
+  module String_parser = Make_parser (String_input)
+
+  let parse_string s =
+    let input : String_input.t = { buf = s; pos = 0 } in
+    match String_parser.parse_one input with
+    | x ->
+      if input.pos <> String.length s then
+        Error (input.pos, "data after canonical S-expression")
       else
-        read_size ((10 * acc) + idx)
-  in
-  let rec parse () =
-    peek stream >>= function
-    | '(' ->
-      Stream.junk stream;
-      parse_list () >>| fun l -> Sexp.List l
-    | _ -> read_size 0 >>= read_string stream >>| fun x -> Sexp.Atom x
-  and parse_list () =
-    peek stream >>= function
-    | ')' ->
-      Stream.junk stream;
-      ok []
-    | ':' -> Error "missing size"
-    | _ ->
-      let head = parse () in
-      head >>= fun head ->
-      parse_list () >>| fun tail -> head :: tail
-  in
-  parse ()
+        Ok x
+    | exception e -> String_input.error_of_exn input e
 
-let buffer () = Buffer.create 1024
+  let parse_string_many s =
+    let input : String_input.t = { buf = s; pos = 0 } in
+    match String_parser.parse_many input 0 [] with
+    | l -> Ok (List.rev l)
+    | exception e -> String_input.error_of_exn input e
 
-let to_buffer ~buf sexp =
-  let rec loop = function
-    | Sexp.Atom str ->
-      Buffer.add_string buf (string_of_int (String.length str));
-      Buffer.add_string buf ":";
-      Buffer.add_string buf str
-    | Sexp.List e ->
-      Buffer.add_char buf '(';
-      List.iter e ~f:loop;
-      Buffer.add_char buf ')'
-  in
-  loop sexp
+  module In_channel_input = struct
+    type t = in_channel
 
-let to_string sexp =
-  let buf = buffer () in
-  to_buffer sexp ~buf;
-  Buffer.contents buf
+    let read_string = really_input_string
 
-let to_channel oc sexp =
-  let rec loop = function
-    | Sexp.Atom str ->
-      output_string oc (string_of_int (String.length str));
-      output_char oc ':';
-      output_string oc str
-    | Sexp.List e ->
-      output_char oc '(';
-      List.iter e ~f:loop;
-      output_char oc ')'
-  in
-  loop sexp
+    let read_char = input_char
+  end
 
-let parse_string string =
-  let open Result.O in
-  let stream = Stream.of_string string in
-  let* result = parse stream in
-  match Stream.peek stream with
-  | Some _ -> Error "not whole string consumed"
-  | None -> Ok result
+  module In_channel_parser = Make_parser (In_channel_input)
+
+  let input_opt ic =
+    let pos = LargeFile.pos_in ic in
+    match In_channel_parser.parse_one ic with
+    | x -> Ok (Some x)
+    | exception End_of_file ->
+      if LargeFile.pos_in ic = pos then
+        Ok None
+      else
+        Error premature_end
+    | exception Parse_error msg -> Error msg
+
+  let input ic =
+    match input_opt ic with
+    | Ok None -> Error premature_end
+    | Ok (Some x) -> Ok x
+    | Error msg -> Error msg
+
+  let input_many =
+    let rec loop ic acc =
+      match input_opt ic with
+      | Error _ as res -> res
+      | Ok None -> Ok (List.rev acc)
+      | Ok (Some x) -> loop ic (x :: acc)
+    in
+    fun ic -> loop ic []
+
+  let serialised_length =
+    let rec loop acc t =
+      match t with
+      | Atom s ->
+        let len = String.length s in
+        let x = ref len in
+        let len_len = ref 1 in
+        while !x > 9 do
+          x := !x / 10;
+          incr len_len
+        done;
+        acc + !len_len + 1 + len
+      | List l -> List.fold_left loop acc l
+    in
+    fun t -> loop 0 t
+
+  let to_buffer buf sexp =
+    let rec loop = function
+      | Atom str ->
+        Buffer.add_string buf (string_of_int (String.length str));
+        Buffer.add_string buf ":";
+        Buffer.add_string buf str
+      | List e ->
+        Buffer.add_char buf '(';
+        List.iter loop e;
+        Buffer.add_char buf ')'
+    in
+    loop sexp
+
+  let to_string sexp =
+    let buf = Buffer.create (serialised_length sexp) in
+    to_buffer buf sexp;
+    Buffer.contents buf
+
+  let to_channel oc sexp =
+    let rec loop = function
+      | Atom str ->
+        output_string oc (string_of_int (String.length str));
+        output_char oc ':';
+        output_string oc str
+      | List l ->
+        output_char oc '(';
+        List.iter loop l;
+        output_char oc ')'
+    in
+    loop sexp
+end
