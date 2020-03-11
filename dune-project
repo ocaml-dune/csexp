@@ -13,6 +13,8 @@
 
 (package
  (name csexp)
+ (depends
+   (ppx_expect :with-test))
  (synopsis "Parsing and printing of S-expressions in Canonical form")
  (description "
 This library provides minimal support for Canonical S-expressions
