@@ -14,6 +14,7 @@
 (package
  (name csexp)
  (depends
+   (ocaml (>= 4.03.0))
    (ppx_expect :with-test))
  (synopsis "Parsing and printing of S-expressions in Canonical form")
  (description "
