@@ -7,7 +7,8 @@
   "Quentin Hocquet <mefyl@gruntech.org>"
   "Jane Street Group, LLC <opensource@janestreet.com>"
   "Jeremie Dimino <jeremie@dimino.org>")
-(source (github ocaml/dune))
+(source (github diml/csexp))
+(documentation "https://diml.github.io/csexp/")
 
 (generate_opam_files true)
 
