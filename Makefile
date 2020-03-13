@@ -1,7 +1,7 @@
 INSTALL_ARGS := $(if $(PREFIX),--prefix $(PREFIX),)
 
 default:
-	dune build
+	dune runtest
 
 test:
 	dune runtest
