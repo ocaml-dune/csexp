@@ -1,4 +1,4 @@
-(lang dune 2.0)
+(lang dune 2.5)
 (name csexp)
 
 (license MIT)
@@ -15,8 +15,9 @@
 (package
  (name csexp)
  (depends
-   (ocaml (>= 4.04.0))
-   (ppx_expect :with-test))
+   (ocaml (>= 4.02.3))
+   (ppx_expect :with-test)
+   (result (>= 1.5)))
  (synopsis "Parsing and printing of S-expressions in Canonical form")
  (description "
 This library provides minimal support for Canonical S-expressions

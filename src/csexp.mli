@@ -27,6 +27,7 @@ module type Sexp = sig
 end
 
 module Make (Sexp : Sexp) : sig
+  include module type of Result
   (** {2 Parsing} *)
 
   (** [parse_string s] parses a single S-expression encoded in canonical form in

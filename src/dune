@@ -1,2 +1,3 @@
 (library
- (public_name csexp))
+ (public_name csexp)
+ (libraries result))
