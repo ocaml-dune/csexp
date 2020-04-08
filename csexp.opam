@@ -25,9 +25,9 @@ authors: [
   "Jeremie Dimino <jeremie@dimino.org>"
 ]
 license: "MIT"
-homepage: "https://github.com/diml/csexp"
-doc: "https://diml.github.io/csexp/"
-bug-reports: "https://github.com/diml/csexp/issues"
+homepage: "https://github.com/ocaml-dune/csexp"
+doc: "https://ocaml-dune.github.io/csexp/"
+bug-reports: "https://github.com/ocaml-dune/csexp/issues"
 depends: [
   "dune" {>= "2.0"}
   "ocaml" {>= "4.04.0"}
@@ -47,4 +47,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/diml/csexp.git"
+dev-repo: "git+https://github.com/ocaml-dune/csexp.git"
