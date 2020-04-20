@@ -29,9 +29,10 @@ homepage: "https://github.com/ocaml-dune/csexp"
 doc: "https://ocaml-dune.github.io/csexp/"
 bug-reports: "https://github.com/ocaml-dune/csexp/issues"
 depends: [
-  "dune" {>= "2.0"}
-  "ocaml" {>= "4.04.0"}
+  "dune" {>= "2.5"}
+  "ocaml" {>= "4.02.3"}
   "ppx_expect" {with-test}
+  "result" {>= "1.5"}
 ]
 build: [
   ["dune" "subst"] {pinned}

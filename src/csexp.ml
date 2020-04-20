@@ -6,6 +6,7 @@ end
 
 module Make (Sexp : Sexp) = struct
   open Sexp
+  include Result
 
   module type Input = sig
     type t
