@@ -4,6 +4,14 @@ module type Sexp = sig
     | List of t list
 end
 
+module type Monad = sig
+  type 'a t
+
+  val return : 'a -> 'a t
+
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+end
+
 module Make (Sexp : Sexp) = struct
   open Sexp
   include Result
@@ -11,9 +19,11 @@ module Make (Sexp : Sexp) = struct
   module type Input = sig
     type t
 
-    val read_string : t -> int -> string
+    module Monad : Monad
 
-    val read_char : t -> char
+    val read_string : t -> int -> string Monad.t
+
+    val read_char : t -> char Monad.t
   end
 
   exception Parse_error of string
@@ -29,7 +39,7 @@ module Make (Sexp : Sexp) = struct
     let int_of_digit c = Char.code c - Char.code '0'
 
     let rec parse_atom input len =
-      match Input.read_char input with
+      Input.Monad.bind (Input.read_char input) @@ function
       | '0' .. '9' as c ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
@@ -37,30 +47,30 @@ module Make (Sexp : Sexp) = struct
         else
           parse_atom input len
       | ':' ->
-        let s = Input.read_string input len in
-        Atom s
+        Input.Monad.bind (Input.read_string input len) @@ fun s ->
+        Input.Monad.return @@ Atom s
       | _ -> invalid_character ()
 
     let rec parse_many input depth acc =
-      match Input.read_char input with
+      Input.Monad.bind (Input.read_char input) @@ function
       | '(' ->
-        let sexps = parse_many input (depth + 1) [] in
+        Input.Monad.bind (parse_many input (depth + 1) []) @@ fun sexps ->
         parse_many input (depth + 1) (List sexps :: acc)
       | ')' ->
         if depth = 0 then
           missing_left_parenthesis ()
         else
-          List.rev acc
+          Input.Monad.return @@ List.rev acc
       | '0' .. '9' as c ->
-        let sexp = parse_atom input (int_of_digit c) in
+        Input.Monad.bind (parse_atom input (int_of_digit c)) @@ fun sexp ->
         parse_many input depth (sexp :: acc)
       | _ -> invalid_character ()
 
-    let parse_one input =
-      match Input.read_char input with
+    let parse input =
+      Input.Monad.bind (Input.read_char input) @@ function
       | '(' ->
-        let sexps = parse_many input 1 [] in
-        List sexps
+        Input.Monad.bind (parse_many input 1 []) @@ fun sexps ->
+        Input.Monad.return @@ List sexps
       | ')' -> missing_left_parenthesis ()
       | '0' .. '9' as c -> parse_atom input (int_of_digit c)
       | _ -> invalid_character ()
@@ -69,11 +79,21 @@ module Make (Sexp : Sexp) = struct
 
   let premature_end = "premature end of input"
 
+  module Id_monad = struct
+    type 'a t = 'a
+
+    let return x = x
+
+    let bind x f = f x
+  end
+
   module String_input = struct
     type t =
       { buf : string
       ; mutable pos : int
       }
+
+    module Monad = Id_monad
 
     let read_string t len =
       let pos = t.pos in
@@ -96,7 +116,7 @@ module Make (Sexp : Sexp) = struct
 
   let parse_string s =
     let input : String_input.t = { buf = s; pos = 0 } in
-    match String_parser.parse_one input with
+    match String_parser.parse input with
     | x ->
       if input.pos <> String.length s then
         Error (input.pos, "data after canonical S-expression")
@@ -113,6 +133,8 @@ module Make (Sexp : Sexp) = struct
   module In_channel_input = struct
     type t = in_channel
 
+    module Monad = Id_monad
+
     let read_string = really_input_string
 
     let read_char = input_char
@@ -122,7 +144,7 @@ module Make (Sexp : Sexp) = struct
 
   let input_opt ic =
     let pos = LargeFile.pos_in ic in
-    match In_channel_parser.parse_one ic with
+    match In_channel_parser.parse ic with
     | x -> Ok (Some x)
     | exception End_of_file ->
       if LargeFile.pos_in ic = pos then
