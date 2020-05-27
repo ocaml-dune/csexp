@@ -73,11 +73,11 @@ let%expect_test _ =
 
 let%expect_test _ =
   parse "(a)";
-  [%expect {| Error "invalid character" |}]
+  [%expect {| Error "invalid character 'a'" |}]
 
 let%expect_test _ =
   parse "(:)";
-  [%expect {| Error "invalid character" |}]
+  [%expect {| Error "invalid character ':'" |}]
 
 let%expect_test _ =
   parse "(4:foo)";
@@ -104,12 +104,14 @@ let sexp_then_stuff s =
   close_in ic;
   Lazy.force delete
 
-let%expect_test _ = sexp_then_stuff "(3:foo)(3:foo)";
+let%expect_test _ =
+  sexp_then_stuff "(3:foo)(3:foo)";
   [%expect {|
     Ok "(3:foo)"
     ( |}]
 
-let%expect_test _ = sexp_then_stuff "(3:foo)Additional_stuff";
+let%expect_test _ =
+  sexp_then_stuff "(3:foo)Additional_stuff";
   [%expect {|
     Ok "(3:foo)"
     A |}]

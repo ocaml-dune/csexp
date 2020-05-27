@@ -69,4 +69,26 @@ module Make (Sexp : Sexp) : sig
   (** [output oc sexp] outputs the S-expression [sexp] converted to its
       canonical form to channel [oc]. *)
   val to_channel : out_channel -> Sexp.t -> unit
+
+  module type Input = sig
+    type t
+
+    module Monad : sig
+      type 'a t
+
+      val return : 'a -> 'a t
+
+      val bind : 'a t -> ('a -> 'b t) -> 'b t
+    end
+
+    val read_string : t -> int -> (string, string) result Monad.t
+
+    val read_char : t -> (char, string) result Monad.t
+  end
+
+  module Make_parser (Input : Input) : sig
+    val parse : Input.t -> (Sexp.t, string) result Input.Monad.t
+
+    val parse_many : Input.t -> (Sexp.t list, string) result Input.Monad.t
+  end
 end
