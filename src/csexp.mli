@@ -70,9 +70,16 @@ module Make (Sexp : Sexp) : sig
       canonical form to channel [oc]. *)
   val to_channel : out_channel -> Sexp.t -> unit
 
+  (** {3 Low level parser}
+
+      Low level parsing interface with fine-grain control over the input monad.
+      Suitable for Lwt or Async integration. *)
+
   module type Input = sig
+    (** Type of an input source. *)
     type t
 
+    (** Monad wrapping values returned by the input source *)
     module Monad : sig
       type 'a t
 
@@ -81,14 +88,22 @@ module Make (Sexp : Sexp) : sig
       val bind : 'a t -> ('a -> 'b t) -> 'b t
     end
 
+    (** [read_string source size] reads exactly [size] bytes from [source] and
+        return them as a string. Reaching the end of the input before [size]
+        bytes have been read is an [Error]. *)
     val read_string : t -> int -> (string, string) result Monad.t
 
+    (** [read_char source] is [read_string source 1], except the result is
+        returned as a single character.*)
     val read_char : t -> (char, string) result Monad.t
   end
 
   module Make_parser (Input : Input) : sig
+    (** Read exactly one canonical S-expressions from the input. Note that this
+        function never raises [End_of_file]. Instead, it returns [Error]. *)
     val parse : Input.t -> (Sexp.t, string) result Input.Monad.t
 
+    (** Read many S-expressions until the end of input is reached. *)
     val parse_many : Input.t -> (Sexp.t list, string) result Input.Monad.t
   end
 end
