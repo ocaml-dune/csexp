@@ -38,50 +38,51 @@ module Make (Sexp : Sexp) = struct
 
     let ( >>= ) = Input.Monad.bind
 
+    open Input.Monad
+
     let rec parse_atom input len =
       Input.read_char input >>= function
-      | Result.Ok c when '0' <= c && c <= '9' ->
+      | Ok c when '0' <= c && c <= '9' ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
-          Input.Monad.return @@ parse_error "atom too big to represent"
+          return @@ parse_error "atom too big to represent"
         else
           parse_atom input len
-      | Result.Ok ':' -> (
+      | Ok ':' -> (
         Input.read_string input len >>= function
-        | Result.Ok s -> Input.Monad.return @@ Result.Ok (Atom s)
-        | Result.Error e -> Input.Monad.return @@ Result.Error e )
-      | Result.Ok c -> Input.Monad.return @@ invalid_character c
-      | Result.Error e -> Input.Monad.return @@ Result.Error e
+        | Ok s -> return @@ Ok (Atom s)
+        | Error e -> return @@ Error e )
+      | Ok c -> return @@ invalid_character c
+      | Error e -> return @@ Error e
 
     let rec parse_many depth input acc =
       Input.read_char input >>= function
-      | Result.Ok '(' -> (
+      | Ok '(' -> (
         parse_many (depth + 1) input [] >>= function
-        | Result.Ok sexps -> parse_many (depth + 1) input @@ (List sexps :: acc)
-        | e -> Input.Monad.return e )
-      | Result.Ok ')' ->
+        | Ok sexps -> parse_many (depth + 1) input @@ (List sexps :: acc)
+        | e -> return e )
+      | Ok ')' ->
         if depth = 0 then
-          Input.Monad.return @@ missing_left_parenthesis ()
+          return @@ missing_left_parenthesis ()
         else
-          Input.Monad.return @@ Result.Ok (List.rev acc)
-      | Result.Ok c when '0' <= c && c <= '9' -> (
+          return @@ Ok (List.rev acc)
+      | Ok c when '0' <= c && c <= '9' -> (
         parse_atom input (int_of_digit c) >>= function
-        | Result.Ok sexp -> parse_many depth input (sexp :: acc)
-        | Result.Error e -> Input.Monad.return @@ Result.Error e )
-      | Result.Ok c -> Input.Monad.return @@ invalid_character c
-      | Result.Error e -> Input.Monad.return @@ Result.Error e
+        | Ok sexp -> parse_many depth input (sexp :: acc)
+        | Error e -> return @@ Error e )
+      | Ok c -> return @@ invalid_character c
+      | Error e -> return @@ Error e
 
     let parse input =
       Input.read_char input >>= function
-      | Result.Ok '(' -> (
+      | Ok '(' -> (
         parse_many 1 input [] >>= function
-        | Result.Ok sexps -> Input.Monad.return @@ Result.Ok (List sexps)
-        | Result.Error e -> Input.Monad.return @@ Result.Error e )
-      | Result.Ok ')' -> Input.Monad.return @@ missing_left_parenthesis ()
-      | Result.Ok c when '0' <= c && c <= '9' ->
-        parse_atom input (int_of_digit c)
-      | Result.Ok c -> Input.Monad.return @@ invalid_character c
-      | Result.Error e -> Input.Monad.return @@ Result.Error e
+        | Ok sexps -> return @@ Ok (List sexps)
+        | Error e -> return @@ Error e )
+      | Ok ')' -> return @@ missing_left_parenthesis ()
+      | Ok c when '0' <= c && c <= '9' -> parse_atom input (int_of_digit c)
+      | Ok c -> return @@ invalid_character c
+      | Error e -> return @@ Error e
 
     let parse_many input = parse_many 0 input []
   end
@@ -110,18 +111,18 @@ module Make (Sexp : Sexp) = struct
       if pos + len <= String.length t.buf then (
         let s = String.sub t.buf pos len in
         t.pos <- pos + len;
-        Result.Ok s
+        Ok s
       ) else
-        Result.Error premature_end
+        Error premature_end
 
     let read_char t =
       if t.pos + 1 <= String.length t.buf then (
         let pos = t.pos in
         let c = t.buf.[pos] in
         t.pos <- pos + 1;
-        Result.Ok c
+        Ok c
       ) else
-        Result.Error premature_end
+        Error premature_end
   end
 
   module String_parser = Make_parser (String_input)
@@ -139,8 +140,8 @@ module Make (Sexp : Sexp) = struct
   let parse_string_many s =
     let input : String_input.t = { buf = s; pos = 0 } in
     match String_parser.parse_many input with
-    | Result.Ok l -> Result.Ok (List.rev l)
-    | Result.Error e -> Result.Error (input.pos, e)
+    | Ok l -> Ok (List.rev l)
+    | Error e -> Error (input.pos, e)
 
   module In_channel_input = struct
     type t = in_channel
@@ -148,12 +149,11 @@ module Make (Sexp : Sexp) = struct
     module Monad = Id_monad
 
     let read_string size input =
-      try Result.Ok (really_input_string size input)
-      with End_of_file -> Result.Error premature_end
+      try Ok (really_input_string size input)
+      with End_of_file -> Error premature_end
 
     let read_char input =
-      try Result.Ok (input_char input)
-      with End_of_file -> Result.Error premature_end
+      try Ok (input_char input) with End_of_file -> Error premature_end
   end
 
   module In_channel_parser = Make_parser (In_channel_input)
