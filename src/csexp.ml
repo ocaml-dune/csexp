@@ -42,7 +42,7 @@ module Make (Sexp : Sexp) = struct
 
     let rec parse_atom input len =
       Input.read_char input >>= function
-      | Ok c when '0' <= c && c <= '9' ->
+      | Ok ('0' .. '9' as c) ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
           return @@ parse_error "atom too big to represent"
