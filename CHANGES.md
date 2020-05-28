@@ -1,4 +1,4 @@
-# Unreleased
+# 1.2.0
 
 - Expose low level, monad agnostic parser. (#2, @mefyl)
 
