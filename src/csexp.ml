@@ -36,8 +36,10 @@ module Make (Sexp : Sexp) = struct
   module Make_parser (Input : Input) = struct
     let int_of_digit c = Char.code c - Char.code '0'
 
+    let ( >>= ) = Input.Monad.bind
+
     let rec parse_atom input len =
-      Input.Monad.bind (Input.read_char input) @@ function
+      Input.read_char input >>= function
       | Result.Ok c when '0' <= c && c <= '9' ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
@@ -45,16 +47,16 @@ module Make (Sexp : Sexp) = struct
         else
           parse_atom input len
       | Result.Ok ':' -> (
-        Input.Monad.bind (Input.read_string input len) @@ function
+        Input.read_string input len >>= function
         | Result.Ok s -> Input.Monad.return @@ Result.Ok (Atom s)
         | Result.Error e -> Input.Monad.return @@ Result.Error e )
       | Result.Ok c -> Input.Monad.return @@ invalid_character c
       | Result.Error e -> Input.Monad.return @@ Result.Error e
 
     let rec parse_many depth input acc =
-      Input.Monad.bind (Input.read_char input) @@ function
+      Input.read_char input >>= function
       | Result.Ok '(' -> (
-        Input.Monad.bind (parse_many (depth + 1) input []) @@ function
+        parse_many (depth + 1) input [] >>= function
         | Result.Ok sexps -> parse_many (depth + 1) input @@ (List sexps :: acc)
         | e -> Input.Monad.return e )
       | Result.Ok ')' ->
@@ -63,16 +65,16 @@ module Make (Sexp : Sexp) = struct
         else
           Input.Monad.return @@ Result.Ok (List.rev acc)
       | Result.Ok c when '0' <= c && c <= '9' -> (
-        Input.Monad.bind (parse_atom input (int_of_digit c)) @@ function
+        parse_atom input (int_of_digit c) >>= function
         | Result.Ok sexp -> parse_many depth input (sexp :: acc)
         | Result.Error e -> Input.Monad.return @@ Result.Error e )
       | Result.Ok c -> Input.Monad.return @@ invalid_character c
       | Result.Error e -> Input.Monad.return @@ Result.Error e
 
     let parse input =
-      Input.Monad.bind (Input.read_char input) @@ function
+      Input.read_char input >>= function
       | Result.Ok '(' -> (
-        Input.Monad.bind (parse_many 1 input []) @@ function
+        parse_many 1 input [] >>= function
         | Result.Ok sexps -> Input.Monad.return @@ Result.Ok (List sexps)
         | Result.Error e -> Input.Monad.return @@ Result.Error e )
       | Result.Ok ')' -> Input.Monad.return @@ missing_left_parenthesis ()
