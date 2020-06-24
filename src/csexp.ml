@@ -15,6 +15,10 @@ end
 module Make (Sexp : Sexp) = struct
   open Sexp
 
+  type ('a, 'b) result = ('a, 'b) Result.result =
+    | Ok of 'a
+    | Error of 'b
+
   module type Input = sig
     type t
 
@@ -25,7 +29,7 @@ module Make (Sexp : Sexp) = struct
     val read_char : t -> (char, string) Result.t Monad.t
   end
 
-  let parse_error f = Format.ksprintf (fun msg -> Result.Error msg) f
+  let parse_error f = Format.ksprintf (fun msg -> Error msg) f
 
   let invalid_character c = parse_error "invalid character %C" c
 
