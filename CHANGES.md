@@ -1,3 +1,7 @@
+# 1.2.2
+
+- Fix compatibility with 4.02.3
+
 # 1.2.1
 
 - Remove inclusion of the `Result` module, which was accidentally
