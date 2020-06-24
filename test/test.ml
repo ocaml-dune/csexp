@@ -123,3 +123,20 @@ let%expect_test _ =
 let%expect_test _ =
   parse "(3:foo)additional_stuff";
   [%expect {| Error "data after canonical S-expression" |}]
+
+let parse_many s =
+  match parse_string_many s with
+  | Error (_, msg) -> print_parsed (Error msg)
+  | Ok xs -> xs |> List.iter (fun x -> print_parsed (Ok x))
+
+let%expect_test "parse_string_many - parse empty string" =
+  parse_many "";
+  [%expect {| Error "premature end of input" |}]
+
+let%expect_test "parse_string_many - parse a single csexp" =
+  parse_many "(3:foo)";
+  [%expect {| Error "premature end of input" |}]
+
+let%expect_test "parse_string_many - parse many csexp" =
+  parse_many "(3:foo)(3:bar)";
+  [%expect {| Error "premature end of input" |}]
