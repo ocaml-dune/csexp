@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fix `parse_string_many`
+
 # 1.2.2
 
 - Fix compatibility with 4.02.3
