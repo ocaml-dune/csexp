@@ -14,7 +14,6 @@ end
 
 module Make (Sexp : Sexp) = struct
   open Sexp
-  include Result
 
   module type Input = sig
     type t
@@ -26,7 +25,7 @@ module Make (Sexp : Sexp) = struct
     val read_char : t -> (char, string) result Monad.t
   end
 
-  let parse_error f = Format.ksprintf (fun msg -> Result.Error msg) f
+  let parse_error f = Format.ksprintf (fun msg -> Error msg) f
 
   let invalid_character c = parse_error "invalid character %C" c
 

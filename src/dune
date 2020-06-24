@@ -1,3 +1,4 @@
 (library
  (public_name csexp)
+ (flags -open Result)
  (libraries result))
