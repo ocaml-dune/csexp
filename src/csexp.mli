@@ -28,7 +28,6 @@ end
 
 module Make (Sexp : Sexp) : sig
   (** {2 Parsing} *)
-  include module type of Result
 
   (** [parse_string s] parses a single S-expression encoded in canonical form in
       [s]. It is an error for [s] to contain a S-expression followed by more
