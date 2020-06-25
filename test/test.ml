@@ -73,11 +73,11 @@ let%expect_test _ =
 
 let%expect_test _ =
   parse "(a)";
-  [%expect {| Error "invalid character 'a'" |}]
+  [%expect {| Error "invalid character 'a', expected '(', ')' or '0'..'9'" |}]
 
 let%expect_test _ =
   parse "(:)";
-  [%expect {| Error "invalid character ':'" |}]
+  [%expect {| Error "invalid character ':', expected '(', ')' or '0'..'9'" |}]
 
 let%expect_test _ =
   parse "(4:foo)";

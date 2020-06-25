@@ -21,179 +21,212 @@ module Make (Sexp : Sexp) = struct
     | Ok of 'a
     | Error of 'b
 
-  module type Input = sig
-    type t
+  module Parser = struct
+    exception Parse_error of string
 
-    module Monad : Monad
+    let parse_error msg = raise (Parse_error msg)
 
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+    let parse_errorf f = Format.ksprintf parse_error f
 
-    val read_char : t -> (char, string) Result.t Monad.t
+    let premature_end_of_input = "premature end of input"
+
+    module Lexer = struct
+      type state =
+        | Init
+        | Parsing_length
+
+      type t =
+        { mutable state : state
+        ; mutable n : int
+        }
+
+      let create () = { state = Init; n = 0 }
+
+      let int_of_digit c = Char.code c - Char.code '0'
+
+      type _ token =
+        | Await : [> `other ] token
+        | Lparen : [> `other ] token
+        | Rparen : [> `other ] token
+        | Atom : int -> [> `atom ] token
+
+      let feed t c =
+        match (t.state, c) with
+        | Init, '(' -> Lparen
+        | Init, ')' -> Rparen
+        | Init, '0' .. '9' ->
+          t.state <- Parsing_length;
+          t.n <- int_of_digit c;
+          Await
+        | Init, _ ->
+          parse_errorf "invalid character %C, expected '(', ')' or '0'..'9'" c
+        | Parsing_length, '0' .. '9' ->
+          let len = (t.n * 10) + int_of_digit c in
+          if len > Sys.max_string_length then
+            parse_error "atom too big to represent"
+          else (
+            t.n <- len;
+            Await
+          )
+        | Parsing_length, ':' ->
+          t.state <- Init;
+          Atom t.n
+        | Parsing_length, _ ->
+          parse_errorf
+            "invalid character %C while parsing atom length, expected '0'..'9' \
+             or ':'"
+            c
+
+      let feed_eoi t =
+        match t.state with
+        | Init -> ()
+        | Parsing_length -> parse_error premature_end_of_input
+    end
+
+    module Stack = struct
+      type t =
+        | Empty
+        | Open of t
+        | Sexp of Sexp.t * t
+
+      let open_paren stack = Open stack
+
+      let close_paren =
+        let rec loop acc = function
+          | Empty ->
+            parse_error "right parenthesis without matching left parenthesis"
+          | Sexp (sexp, t) -> loop (sexp :: acc) t
+          | Open t -> Sexp (List acc, t)
+        in
+        fun t -> loop [] t
+
+      let to_list =
+        let rec loop acc = function
+          | Empty -> acc
+          | Sexp (sexp, t) -> loop (sexp :: acc) t
+          | Open _ -> parse_error premature_end_of_input
+        in
+        fun t -> loop [] t
+
+      let add_atom s stack = Sexp (Atom s, stack)
+
+      let add_token (x : [ `other ] Lexer.token) stack =
+        match x with
+        | Await -> stack
+        | Lparen -> open_paren stack
+        | Rparen -> close_paren stack
+    end
   end
 
-  let parse_error f = Format.ksprintf (fun msg -> Error msg) f
+  open Parser
 
-  let invalid_character c = parse_error "invalid character %C" c
+  let feed_eoi_single lexer stack =
+    match
+      Lexer.feed_eoi lexer;
+      Stack.to_list stack
+    with
+    | exception Parse_error msg -> Error msg
+    | [ x ] -> Ok x
+    | [] -> Error premature_end_of_input
+    | _ :: _ :: _ -> assert false
 
-  let missing_left_parenthesis () =
-    parse_error "right parenthesis without matching left parenthesis"
+  let feed_eoi_many lexer stack =
+    match
+      Lexer.feed_eoi lexer;
+      Stack.to_list stack
+    with
+    | exception Parse_error msg -> Error msg
+    | l -> Ok l
 
-  module Make_parser (Input : Input) = struct
-    let int_of_digit c = Char.code c - Char.code '0'
+  let[@inlined always] one_token s pos len lexer stack k =
+    match Lexer.feed lexer (String.unsafe_get s pos) with
+    | exception Parse_error msg -> Error (pos, msg)
+    | Atom atom_len -> (
+      match String.sub s (pos + 1) atom_len with
+      | exception _ -> Error (len, premature_end_of_input)
+      | atom ->
+        let pos = pos + 1 + atom_len in
+        k s pos len lexer (Stack.add_atom atom stack) )
+    | (Await | Lparen | Rparen) as x -> (
+      match Stack.add_token x stack with
+      | exception Parse_error msg -> Error (pos, msg)
+      | stack -> k s (pos + 1) len lexer stack )
 
-    let ( >>= ) = Input.Monad.bind
-
-    open Input.Monad
-
-    let rec parse_atom input len =
-      Input.read_char input >>= function
-      | Error e -> return @@ Error e
-      | Ok ('0' .. '9' as c) ->
-        let len = (len * 10) + int_of_digit c in
-        if len > Sys.max_string_length then
-          return @@ parse_error "atom too big to represent"
+  let parse_string =
+    let rec loop s pos len lexer stack =
+      if pos = len then
+        match feed_eoi_single lexer stack with
+        | Error msg -> Error (pos, msg)
+        | Ok _ as ok -> ok
+      else
+        one_token s pos len lexer stack cont
+    and cont s pos len lexer stack =
+      match stack with
+      | Stack.Sexp (sexp, Empty) ->
+        if pos = len then
+          Ok sexp
         else
-          parse_atom input len
-      | Ok ':' -> (
-        Input.read_string input len >>= function
-        | Ok s -> return @@ Ok (Atom s)
-        | Error e -> return @@ Error e )
-      | Ok c -> return @@ invalid_character c
+          Error (pos, "data after canonical S-expression")
+      | stack -> loop s pos len lexer stack
+    in
+    fun s -> loop s 0 (String.length s) (Lexer.create ()) Empty
 
-    let rec parse_many depth input acc =
-      Input.read_char input >>= function
-      | Ok '(' -> (
-        parse_many (depth + 1) input [] >>= function
-        | Ok sexps -> parse_many depth input @@ (List sexps :: acc)
-        | e -> return e )
-      | Ok ')' ->
-        return
-          ( if depth = 0 then
-            missing_left_parenthesis ()
-          else
-            Ok (List.rev acc) )
-      | Ok c when '0' <= c && c <= '9' -> (
-        parse_atom input (int_of_digit c) >>= function
-        | Ok sexp -> parse_many depth input (sexp :: acc)
-        | Error e -> return @@ Error e )
-      | Ok c -> return @@ invalid_character c
-      | Error e ->
-        return
-          ( if depth = 0 then
-            Ok (List.rev acc)
-          else
-            Error e )
-
-    let parse input =
-      Input.read_char input >>= function
-      | Error e -> return @@ Error e
-      | Ok '(' -> (
-        parse_many 1 input [] >>= function
-        | Ok sexps -> return @@ Ok (List sexps)
-        | Error e -> return @@ Error e )
-      | Ok ')' -> return @@ missing_left_parenthesis ()
-      | Ok c when '0' <= c && c <= '9' -> parse_atom input (int_of_digit c)
-      | Ok c -> return @@ invalid_character c
-
-    let parse_many input = parse_many 0 input []
-  end
-  [@@inlined always]
-
-  let premature_end = "premature end of input"
-
-  module Id_monad = struct
-    type 'a t = 'a
-
-    let return x = x
-
-    let bind x f = f x
-  end
-
-  module String_input = struct
-    type t =
-      { buf : string
-      ; mutable pos : int
-      }
-
-    module Monad = Id_monad
-
-    let read_string t len =
-      let pos = t.pos in
-      if pos + len <= String.length t.buf then (
-        let s = String.sub t.buf pos len in
-        t.pos <- pos + len;
-        Ok s
-      ) else
-        Error premature_end
-
-    let read_char t =
-      if t.pos + 1 <= String.length t.buf then (
-        let pos = t.pos in
-        let c = t.buf.[pos] in
-        t.pos <- pos + 1;
-        Ok c
-      ) else
-        Error premature_end
-  end
-
-  module String_parser = Make_parser (String_input)
-
-  let parse_string s =
-    let input : String_input.t = { buf = s; pos = 0 } in
-    match String_parser.parse input with
-    | Ok parsed ->
-      if input.pos <> String.length s then
-        Error (input.pos, "data after canonical S-expression")
+  let parse_string_many =
+    let rec loop s pos len lexer stack =
+      if pos = len then
+        match feed_eoi_many lexer stack with
+        | Error msg -> Error (pos, msg)
+        | Ok _ as ok -> ok
       else
-        Ok parsed
-    | Error msg -> Error (input.pos, msg)
+        one_token s pos len lexer stack loop
+    in
+    fun s -> loop s 0 (String.length s) (Lexer.create ()) Empty
 
-  let parse_string_many s =
-    let input : String_input.t = { buf = s; pos = 0 } in
-    match String_parser.parse_many input with
-    | Ok l -> Ok l
-    | Error e -> Error (input.pos, e)
+  let one_token ic c lexer stack =
+    match Lexer.feed lexer c with
+    | Atom n -> (
+      match really_input_string ic n with
+      | exception End_of_file -> raise (Parse_error premature_end_of_input)
+      | s -> Stack.add_atom s stack )
+    | (Await | Lparen | Rparen) as x -> Stack.add_token x stack
 
-  module In_channel_input = struct
-    type t = in_channel
-
-    module Monad = Id_monad
-
-    let read_string size input =
-      try Ok (really_input_string size input)
-      with End_of_file -> Error premature_end
-
-    let read_char input =
-      try Ok (input_char input) with End_of_file -> Error premature_end
-  end
-
-  module In_channel_parser = Make_parser (In_channel_input)
-
-  let input_opt ic =
-    let pos = LargeFile.pos_in ic in
-    match In_channel_parser.parse ic with
-    | Ok x -> Ok (Some x)
-    | Error msg -> Error msg
-    | exception End_of_file ->
-      if LargeFile.pos_in ic = pos then
-        Ok None
-      else
-        Error premature_end
+  let input_opt =
+    let rec loop ic lexer stack =
+      let c = input_char ic in
+      match one_token ic c lexer stack with
+      | Sexp (sexp, Empty) -> Ok (Some sexp)
+      | stack -> loop ic lexer stack
+    in
+    fun ic ->
+      let lexer = Lexer.create () in
+      match input_char ic with
+      | exception End_of_file -> Ok None
+      | c -> (
+        try
+          match Lexer.feed lexer c with
+          | Atom _ -> assert false
+          | (Await | Lparen | Rparen) as x ->
+            loop ic lexer (Stack.add_token x Empty)
+        with
+        | Parse_error msg -> Error msg
+        | End_of_file -> Error premature_end_of_input )
 
   let input ic =
     match input_opt ic with
-    | Ok None -> Error premature_end
+    | Ok None -> Error premature_end_of_input
     | Ok (Some x) -> Ok x
     | Error msg -> Error msg
 
   let input_many =
-    let rec loop ic acc =
-      match input_opt ic with
-      | Error _ as res -> res
-      | Ok None -> Ok (List.rev acc)
-      | Ok (Some x) -> loop ic (x :: acc)
+    let rec loop ic lexer stack =
+      match input_char ic with
+      | exception End_of_file ->
+        Lexer.feed_eoi lexer;
+        Ok (Stack.to_list stack)
+      | c -> loop ic lexer (one_token ic c lexer stack)
     in
-    fun ic -> loop ic []
+    fun ic ->
+      try loop ic (Lexer.create ()) Empty with Parse_error msg -> Error msg
 
   let serialised_length =
     let rec loop acc t =
@@ -241,4 +274,57 @@ module Make (Sexp : Sexp) = struct
         output_char oc ')'
     in
     loop sexp
+
+  module type Input = sig
+    type t
+
+    module Monad : Monad
+
+    val read_string : t -> int -> (string, string) Result.t Monad.t
+
+    val read_char : t -> (char, string) Result.t Monad.t
+  end
+
+  module Make_parser (Input : Input) = struct
+    open Input.Monad
+
+    let ( >>= ) = bind
+
+    let ( >>=* ) m f =
+      m >>= function
+      | Error _ as err -> return err
+      | Ok x -> f x
+
+    let one_token input c lexer stack =
+      match Lexer.feed lexer c with
+      | exception Parse_error msg -> return (Error msg)
+      | Atom n ->
+        Input.read_string input n >>=* fun s ->
+        return (Ok (Stack.add_atom s stack))
+      | (Await | Lparen | Rparen) as x ->
+        return
+          ( match Stack.add_token x stack with
+          | exception Parse_error msg -> Error msg
+          | stack -> Ok stack )
+
+    let parse =
+      let rec loop input lexer stack =
+        Input.read_char input >>= function
+        | Error _ -> return (feed_eoi_single lexer stack)
+        | Ok c -> (
+          one_token input c lexer stack >>=* function
+          | Sexp (sexp, Empty) -> return (Ok sexp)
+          | stack -> loop input lexer stack )
+      in
+      fun input -> loop input (Lexer.create ()) Empty
+
+    let parse_many =
+      let rec loop input lexer stack =
+        Input.read_char input >>= function
+        | Error _ -> return (feed_eoi_many lexer stack)
+        | Ok c ->
+          one_token input c lexer stack >>=* fun stack -> loop input lexer stack
+      in
+      fun input -> loop input (Lexer.create ()) Empty
+  end
 end
