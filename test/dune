@@ -2,5 +2,7 @@
  (name csexp_tests)
  (libraries csexp)
  (inline_tests)
- (enabled_if (>= %{ocaml_version} 4.04.0))
- (preprocess (pps ppx_expect)))
+ (enabled_if
+  (>= %{ocaml_version} 4.04.0))
+ (preprocess
+  (pps ppx_expect)))
