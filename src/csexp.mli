@@ -74,7 +74,7 @@ module Make (Sexp : Sexp) : sig
       Low level parsing interface with fine-grain control over the input monad.
       Suitable for Lwt or Async integration. *)
 
-  module type Input = sig
+  module type Input2 = sig
     (** Type of an input source. *)
     type t
 
@@ -87,22 +87,53 @@ module Make (Sexp : Sexp) : sig
       val bind : 'a t -> ('a -> 'b t) -> 'b t
     end
 
-    (** [read_string source size] reads exactly [size] bytes from [source] and
-        return them as a string. Reaching the end of the input before [size]
-        bytes have been read is an [Error]. *)
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+    (** [read_char source] reads a single character from the input. Returns
+        [None] if the end of input has been reached..*)
+    val read_char : t -> char option Monad.t
 
-    (** [read_char source] is [read_string source 1], except the result is
-        returned as a single character.*)
-    val read_char : t -> (char, string) Result.t Monad.t
+    (** [read_string source size] reads exactly [size] bytes from [source] and
+        return them as a string. Returns [None] if there are less than [size]
+        characters available in the input. *)
+    val read_string : t -> int -> string option Monad.t
   end
 
-  module Make_parser (Input : Input) : sig
-    (** Read exactly one canonical S-expressions from the input. Note that this
-        function never raises [End_of_file]. Instead, it returns [Error]. *)
+  module Make_parser2 (Input : Input2) : sig
+    (** Read exactly one canonical S-expressions from the input. If the end of
+        input is reached before a complete S-expression is read, this functions
+        returns [Error]. *)
     val parse : Input.t -> (Sexp.t, string) Result.t Input.Monad.t
 
     (** Read many S-expressions until the end of input is reached. *)
     val parse_many : Input.t -> (Sexp.t list, string) Result.t Input.Monad.t
   end
+
+  (** {3 Deprecated low-level parser} **)
+
+  (** The above are deprecated are they are not handling very well IO errors.
+      More precisely, they match on the error message string to detect end of
+      input conditions. *)
+
+  module type Input = sig
+    type t
+
+    module Monad : sig
+      type 'a t
+
+      val return : 'a -> 'a t
+
+      val bind : 'a t -> ('a -> 'b t) -> 'b t
+    end
+
+    val read_string : t -> int -> (string, string) Result.t Monad.t
+
+    val read_char : t -> (char, string) Result.t Monad.t
+  end
+  [@@deprecated "Use Input2 instead"]
+
+  module Make_parser (Input : Input [@warning "-3"]) : sig
+    val parse : Input.t -> (Sexp.t, string) Result.t Input.Monad.t
+
+    val parse_many : Input.t -> (Sexp.t list, string) Result.t Input.Monad.t
+  end
+  [@@deprecated "Use Make_parser2 instead"]
 end

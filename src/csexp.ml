@@ -21,14 +21,20 @@ module Make (Sexp : Sexp) = struct
     | Ok of 'a
     | Error of 'b
 
-  module type Input = sig
+  module type Input2 = sig
     type t
 
-    module Monad : Monad
+    module Monad : sig
+      type 'a t
 
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+      val return : 'a -> 'a t
 
-    val read_char : t -> (char, string) Result.t Monad.t
+      val bind : 'a t -> ('a -> 'b t) -> 'b t
+    end
+
+    val read_string : t -> int -> string option Monad.t
+
+    val read_char : t -> char option Monad.t
   end
 
   let parse_error f = Format.ksprintf (fun msg -> Error msg) f
@@ -38,7 +44,9 @@ module Make (Sexp : Sexp) = struct
   let missing_left_parenthesis () =
     parse_error "right parenthesis without matching left parenthesis"
 
-  module Make_parser (Input : Input) = struct
+  let premature_end = Error "premature end of input"
+
+  module Make_parser2 (Input : Input2) = struct
     let int_of_digit c = Char.code c - Char.code '0'
 
     let ( >>= ) = Input.Monad.bind
@@ -47,59 +55,57 @@ module Make (Sexp : Sexp) = struct
 
     let rec parse_atom input len =
       Input.read_char input >>= function
-      | Error e -> return @@ Error e
-      | Ok ('0' .. '9' as c) ->
+      | None -> return premature_end
+      | Some ('0' .. '9' as c) ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
           return @@ parse_error "atom too big to represent"
         else
           parse_atom input len
-      | Ok ':' -> (
+      | Some ':' -> (
         Input.read_string input len >>= function
-        | Ok s -> return @@ Ok (Atom s)
-        | Error e -> return @@ Error e )
-      | Ok c -> return @@ invalid_character c
+        | Some s -> return @@ Ok (Atom s)
+        | None -> return premature_end )
+      | Some c -> return @@ invalid_character c
 
     let rec parse_many depth input acc =
       Input.read_char input >>= function
-      | Ok '(' -> (
+      | Some '(' -> (
         parse_many (depth + 1) input [] >>= function
         | Ok sexps -> parse_many depth input @@ (List sexps :: acc)
         | e -> return e )
-      | Ok ')' ->
+      | Some ')' ->
         return
           ( if depth = 0 then
             missing_left_parenthesis ()
           else
             Ok (List.rev acc) )
-      | Ok c when '0' <= c && c <= '9' -> (
+      | Some ('0' .. '9' as c) -> (
         parse_atom input (int_of_digit c) >>= function
         | Ok sexp -> parse_many depth input (sexp :: acc)
         | Error e -> return @@ Error e )
-      | Ok c -> return @@ invalid_character c
-      | Error e ->
+      | Some c -> return @@ invalid_character c
+      | None ->
         return
           ( if depth = 0 then
             Ok (List.rev acc)
           else
-            Error e )
+            premature_end )
 
     let parse input =
       Input.read_char input >>= function
-      | Error e -> return @@ Error e
-      | Ok '(' -> (
+      | None -> return premature_end
+      | Some '(' -> (
         parse_many 1 input [] >>= function
         | Ok sexps -> return @@ Ok (List sexps)
         | Error e -> return @@ Error e )
-      | Ok ')' -> return @@ missing_left_parenthesis ()
-      | Ok c when '0' <= c && c <= '9' -> parse_atom input (int_of_digit c)
-      | Ok c -> return @@ invalid_character c
+      | Some ')' -> return @@ missing_left_parenthesis ()
+      | Some c when '0' <= c && c <= '9' -> parse_atom input (int_of_digit c)
+      | Some c -> return @@ invalid_character c
 
     let parse_many input = parse_many 0 input []
   end
   [@@inlined always]
-
-  let premature_end = "premature end of input"
 
   module Id_monad = struct
     type 'a t = 'a
@@ -117,26 +123,26 @@ module Make (Sexp : Sexp) = struct
 
     module Monad = Id_monad
 
-    let read_string t len =
-      let pos = t.pos in
-      if pos + len <= String.length t.buf then (
-        let s = String.sub t.buf pos len in
-        t.pos <- pos + len;
-        Ok s
-      ) else
-        Error premature_end
-
     let read_char t =
       if t.pos + 1 <= String.length t.buf then (
         let pos = t.pos in
         let c = t.buf.[pos] in
         t.pos <- pos + 1;
-        Ok c
+        Some c
       ) else
-        Error premature_end
+        None
+
+    let read_string t len =
+      let pos = t.pos in
+      if pos + len <= String.length t.buf then (
+        let s = String.sub t.buf pos len in
+        t.pos <- pos + len;
+        Some s
+      ) else
+        None
   end
 
-  module String_parser = Make_parser (String_input)
+  module String_parser = Make_parser2 (String_input)
 
   let parse_string s =
     let input : String_input.t = { buf = s; pos = 0 } in
@@ -159,15 +165,18 @@ module Make (Sexp : Sexp) = struct
 
     module Monad = Id_monad
 
-    let read_string size input =
-      try Ok (really_input_string size input)
-      with End_of_file -> Error premature_end
-
     let read_char input =
-      try Ok (input_char input) with End_of_file -> Error premature_end
+      match input_char input with
+      | exception End_of_file -> None
+      | c -> Some c
+
+    let read_string size input =
+      match really_input_string size input with
+      | exception End_of_file -> None
+      | s -> Some s
   end
 
-  module In_channel_parser = Make_parser (In_channel_input)
+  module In_channel_parser = Make_parser2 (In_channel_input)
 
   let input_opt ic =
     let pos = LargeFile.pos_in ic in
@@ -178,11 +187,11 @@ module Make (Sexp : Sexp) = struct
       if LargeFile.pos_in ic = pos then
         Ok None
       else
-        Error premature_end
+        premature_end
 
   let input ic =
     match input_opt ic with
-    | Ok None -> Error premature_end
+    | Ok None -> premature_end
     | Ok (Some x) -> Ok x
     | Error msg -> Error msg
 
@@ -241,4 +250,46 @@ module Make (Sexp : Sexp) = struct
         output_char oc ')'
     in
     loop sexp
+
+  module type Input = sig
+    type t
+
+    module Monad : Monad
+
+    val read_string : t -> int -> (string, string) Result.t Monad.t
+
+    val read_char : t -> (char, string) Result.t Monad.t
+  end
+
+  module Make_parser (Input : Input) = struct
+    exception Io_error of string
+
+    include Make_parser2 (struct
+      include Input
+
+      let ( >>= ) = Monad.bind
+
+      let read_string t len =
+        read_string t len >>= function
+        | Ok x -> Monad.return (Some x)
+        | Error "premature end of input" -> Monad.return None
+        | Error msg -> raise (Io_error msg)
+
+      let read_char t =
+        read_char t >>= function
+        | Ok x -> Monad.return (Some x)
+        | Error "premature end of input" -> Monad.return None
+        | Error msg -> raise (Io_error msg)
+    end)
+
+    let parse input =
+      match parse input with
+      | m -> m
+      | exception Io_error msg -> Input.Monad.return (Error msg)
+
+    let parse_many input =
+      match parse_many input with
+      | m -> m
+      | exception Io_error msg -> Input.Monad.return (Error msg)
+  end
 end
