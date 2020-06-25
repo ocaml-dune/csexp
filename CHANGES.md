@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fix `parse_string_many`; it used to fail on all inputs (#6, @rgrinberg)
+
 # 1.2.2
 
 - Fix compatibility with 4.02.3

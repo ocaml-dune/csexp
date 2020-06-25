@@ -47,6 +47,7 @@ module Make (Sexp : Sexp) = struct
 
     let rec parse_atom input len =
       Input.read_char input >>= function
+      | Error e -> return @@ Error e
       | Ok ('0' .. '9' as c) ->
         let len = (len * 10) + int_of_digit c in
         if len > Sys.max_string_length then
@@ -58,28 +59,34 @@ module Make (Sexp : Sexp) = struct
         | Ok s -> return @@ Ok (Atom s)
         | Error e -> return @@ Error e )
       | Ok c -> return @@ invalid_character c
-      | Error e -> return @@ Error e
 
     let rec parse_many depth input acc =
       Input.read_char input >>= function
       | Ok '(' -> (
         parse_many (depth + 1) input [] >>= function
-        | Ok sexps -> parse_many (depth + 1) input @@ (List sexps :: acc)
+        | Ok sexps -> parse_many depth input @@ (List sexps :: acc)
         | e -> return e )
       | Ok ')' ->
-        if depth = 0 then
-          return @@ missing_left_parenthesis ()
-        else
-          return @@ Ok (List.rev acc)
+        return
+          ( if depth = 0 then
+            missing_left_parenthesis ()
+          else
+            Ok (List.rev acc) )
       | Ok c when '0' <= c && c <= '9' -> (
         parse_atom input (int_of_digit c) >>= function
         | Ok sexp -> parse_many depth input (sexp :: acc)
         | Error e -> return @@ Error e )
       | Ok c -> return @@ invalid_character c
-      | Error e -> return @@ Error e
+      | Error e ->
+        return
+          ( if depth = 0 then
+            Ok (List.rev acc)
+          else
+            Error e )
 
     let parse input =
       Input.read_char input >>= function
+      | Error e -> return @@ Error e
       | Ok '(' -> (
         parse_many 1 input [] >>= function
         | Ok sexps -> return @@ Ok (List sexps)
@@ -87,7 +94,6 @@ module Make (Sexp : Sexp) = struct
       | Ok ')' -> return @@ missing_left_parenthesis ()
       | Ok c when '0' <= c && c <= '9' -> parse_atom input (int_of_digit c)
       | Ok c -> return @@ invalid_character c
-      | Error e -> return @@ Error e
 
     let parse_many input = parse_many 0 input []
   end

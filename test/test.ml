@@ -131,12 +131,12 @@ let parse_many s =
 
 let%expect_test "parse_string_many - parse empty string" =
   parse_many "";
-  [%expect {| Error "premature end of input" |}]
+  [%expect {| |}]
 
 let%expect_test "parse_string_many - parse a single csexp" =
   parse_many "(3:foo)";
-  [%expect {| Error "premature end of input" |}]
+  [%expect {| Ok "(3:foo)" |}]
 
 let%expect_test "parse_string_many - parse many csexp" =
   parse_many "(3:foo)(3:bar)";
-  [%expect {| Error "premature end of input" |}]
+  [%expect {| Ok "(3:bar)"Ok "(3:foo)" |}]
