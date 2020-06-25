@@ -130,7 +130,9 @@ module Make (Sexp : Sexp) : sig
   end
   [@@deprecated "Use Input2 instead"]
 
-  module Make_parser (Input : Input [@warning "-3"]) : sig
+  [@@@warning "-3"]
+
+  module Make_parser (Input : Input) : sig
     val parse : Input.t -> (Sexp.t, string) Result.t Input.Monad.t
 
     val parse_many : Input.t -> (Sexp.t list, string) Result.t Input.Monad.t

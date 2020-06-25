@@ -32,9 +32,9 @@ module Make (Sexp : Sexp) = struct
       val bind : 'a t -> ('a -> 'b t) -> 'b t
     end
 
-    val read_string : t -> int -> string option Monad.t
-
     val read_char : t -> char option Monad.t
+
+    val read_string : t -> int -> string option Monad.t
   end
 
   let parse_error f = Format.ksprintf (fun msg -> Error msg) f
