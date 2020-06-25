@@ -151,7 +151,7 @@ module Make (Sexp : Sexp) = struct
   let parse_string_many s =
     let input : String_input.t = { buf = s; pos = 0 } in
     match String_parser.parse_many input with
-    | Ok l -> Ok (List.rev l)
+    | Ok l -> Ok l
     | Error e -> Error (input.pos, e)
 
   module In_channel_input = struct

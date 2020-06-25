@@ -139,4 +139,4 @@ let%expect_test "parse_string_many - parse a single csexp" =
 
 let%expect_test "parse_string_many - parse many csexp" =
   parse_many "(3:foo)(3:bar)";
-  [%expect {| Ok "(3:bar)"Ok "(3:foo)" |}]
+  [%expect {| Ok "(3:foo)"Ok "(3:bar)" |}]
