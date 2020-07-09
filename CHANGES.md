@@ -1,9 +1,9 @@
-# Unreleased
+# 1.3.0
 
 - Add a "feed" API for parsing. This new API let the user feed
   characters one by one to the parser. It gives more control to the
-  user and the handling of IO errors is simpler and more explicit
-  (#9, @jeremiedimino)
+  user and the handling of IO errors is simpler and more
+  explicit. Finally, it allocates less (#9, @jeremiedimino)
 
 - Fixes `input_opt`; it was could never return [None] (#9, fixes #7,
   @jeremiedimino)
