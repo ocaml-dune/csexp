@@ -140,7 +140,7 @@ module Make (Sexp : Sexp) = struct
     | exception Parse_error msg -> Error msg
     | l -> Ok l
 
-  let[@inlined always] one_token s pos len lexer stack k =
+  let one_token s pos len lexer stack k =
     match Lexer.feed lexer (String.unsafe_get s pos) with
     | exception Parse_error msg -> Error (pos, msg)
     | L.Atom atom_len -> (
@@ -153,6 +153,7 @@ module Make (Sexp : Sexp) = struct
       match Stack.add_token x stack with
       | exception Parse_error msg -> Error (pos, msg)
       | stack -> k s (pos + 1) len lexer stack )
+    [@@inlined always]
 
   let parse_string =
     let rec loop s pos len lexer stack =

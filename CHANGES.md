@@ -1,3 +1,7 @@
+# 1.3.1
+
+- Fix compatibility with 4.02.3
+
 # 1.3.0
 
 - Add a "feed" API for parsing. This new API let the user feed
