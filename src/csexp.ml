@@ -83,6 +83,8 @@ module Make (Sexp : Sexp) = struct
         | Parsing_length -> parse_error premature_end_of_input
     end
 
+    module L = Lexer
+
     module Stack = struct
       type t =
         | Empty
@@ -112,9 +114,9 @@ module Make (Sexp : Sexp) = struct
 
       let add_token (x : [ `other ] Lexer.token) stack =
         match x with
-        | Await -> stack
-        | Lparen -> open_paren stack
-        | Rparen -> close_paren stack
+        | L.Await -> stack
+        | L.Lparen -> open_paren stack
+        | L.Rparen -> close_paren stack
     end
   end
 
@@ -141,13 +143,13 @@ module Make (Sexp : Sexp) = struct
   let[@inlined always] one_token s pos len lexer stack k =
     match Lexer.feed lexer (String.unsafe_get s pos) with
     | exception Parse_error msg -> Error (pos, msg)
-    | Atom atom_len -> (
+    | L.Atom atom_len -> (
       match String.sub s (pos + 1) atom_len with
       | exception _ -> Error (len, premature_end_of_input)
       | atom ->
         let pos = pos + 1 + atom_len in
         k s pos len lexer (Stack.add_atom atom stack) )
-    | (Await | Lparen | Rparen) as x -> (
+    | (L.Await | L.Lparen | L.Rparen) as x -> (
       match Stack.add_token x stack with
       | exception Parse_error msg -> Error (pos, msg)
       | stack -> k s (pos + 1) len lexer stack )
@@ -184,11 +186,11 @@ module Make (Sexp : Sexp) = struct
 
   let one_token ic c lexer stack =
     match Lexer.feed lexer c with
-    | Atom n -> (
+    | L.Atom n -> (
       match really_input_string ic n with
       | exception End_of_file -> raise (Parse_error premature_end_of_input)
       | s -> Stack.add_atom s stack )
-    | (Await | Lparen | Rparen) as x -> Stack.add_token x stack
+    | (L.Await | L.Lparen | L.Rparen) as x -> Stack.add_token x stack
 
   let input_opt =
     let rec loop ic lexer stack =
@@ -204,8 +206,8 @@ module Make (Sexp : Sexp) = struct
       | c -> (
         try
           match Lexer.feed lexer c with
-          | Atom _ -> assert false
-          | (Await | Lparen | Rparen) as x ->
+          | L.Atom _ -> assert false
+          | (L.Await | L.Lparen | L.Rparen) as x ->
             loop ic lexer (Stack.add_token x Empty)
         with
         | Parse_error msg -> Error msg
@@ -298,10 +300,10 @@ module Make (Sexp : Sexp) = struct
     let one_token input c lexer stack =
       match Lexer.feed lexer c with
       | exception Parse_error msg -> return (Error msg)
-      | Atom n ->
+      | L.Atom n ->
         Input.read_string input n >>=* fun s ->
         return (Ok (Stack.add_atom s stack))
-      | (Await | Lparen | Rparen) as x ->
+      | (L.Await | L.Lparen | L.Rparen) as x ->
         return
           ( match Stack.add_token x stack with
           | exception Parse_error msg -> Error msg
