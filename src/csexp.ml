@@ -17,7 +17,7 @@ module Make (Sexp : Sexp) = struct
 
   (* This is to keep compatibility with 4.02 without writing [Result.]
      everywhere *)
-  type ('a, 'b) result = ('a, 'b) Result.result =
+  type ('a, 'b) result = ('a, 'b) Result.t =
     | Ok of 'a
     | Error of 'b
 
