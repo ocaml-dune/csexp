@@ -8,7 +8,7 @@ build: [
     "-j"
     jobs
     "@install"
-#   "@runtest" {with-test}
+#   "@runtest" {with-test & ocaml:version >= "4.04"}
     "@doc" {with-doc}
   ]
 ]
