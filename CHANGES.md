@@ -1,3 +1,7 @@
+# 1.3.2
+
+- The project now builds with dune 1.11.0 and onward (#12, @voodoos)
+
 # 1.3.1
 
 - Fix compatibility with 4.02.3

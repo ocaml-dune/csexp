@@ -31,9 +31,9 @@ bug-reports: "https://github.com/ocaml-dune/csexp/issues"
 depends: [
   "dune" {>= "1.11"}
   "ocaml" {>= "4.02.3"}
-  "ppx_expect" {with-test}
   "result" {>= "1.5"}
 ]
+dev-repo: "git+https://github.com/ocaml-dune/csexp.git"
 build: [
   ["dune" "subst"] {pinned}
   [
@@ -44,8 +44,7 @@ build: [
     "-j"
     jobs
     "@install"
-    "@runtest" {with-test}
+#   "@runtest" {with-test}
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/ocaml-dune/csexp.git"
