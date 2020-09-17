@@ -1,4 +1,4 @@
-(lang dune 2.5)
+(lang dune 1.11)
 (name csexp)
 
 (allow_approximate_merlin)
