@@ -18,7 +18,9 @@
  (name csexp)
  (depends
    (ocaml (>= 4.02.3))
-   (ppx_expect :with-test)
+;  (ppx_expect :with-test)
+; Disabled because of a dependency cycle 
+; (see https://github.com/ocaml-opam/opam-depext/issues/121)
    (result (>= 1.5)))
  (synopsis "Parsing and printing of S-expressions in Canonical form")
  (description "
