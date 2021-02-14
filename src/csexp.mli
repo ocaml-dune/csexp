@@ -367,3 +367,7 @@ module Make (Sexp : Sexp) : sig
   end
   [@@deprecated "Use Parser module instead"]
 end
+
+type t =
+  | Atom of string
+  | List of t list
