@@ -26,48 +26,49 @@ module type Sexp = sig
     | List of t list
 end
 
-module Make (Sexp : Sexp) : sig
+module type S = sig
   (** {2 Parsing} *)
+  type sexp
 
   (** [parse_string s] parses a single S-expression encoded in canonical form in
       [s]. It is an error for [s] to contain a S-expression followed by more
       data. In case of error, the offset of the error as well as an error
       message is returned. *)
-  val parse_string : string -> (Sexp.t, int * string) Result.t
+  val parse_string : string -> (sexp, int * string) Result.t
 
   (** [parse_string s] parses a sequence of S-expressions encoded in canonical
       form in [s] *)
-  val parse_string_many : string -> (Sexp.t list, int * string) Result.t
+  val parse_string_many : string -> (sexp list, int * string) Result.t
 
   (** Read exactly one canonical S-expressions from the given channel. Note that
       this function never raises [End_of_file]. Instead, it returns [Error]. *)
-  val input : in_channel -> (Sexp.t, string) Result.t
+  val input : in_channel -> (sexp, string) Result.t
 
   (** Same as [input] but returns [Ok None] if the end of file has already been
       reached. If some more characters are available but the end of file is
       reached before reading a complete S-expression, this function returns
       [Error]. *)
-  val input_opt : in_channel -> (Sexp.t option, string) Result.t
+  val input_opt : in_channel -> (sexp option, string) Result.t
 
   (** Read many S-expressions until the end of input is reached. *)
-  val input_many : in_channel -> (Sexp.t list, string) Result.t
+  val input_many : in_channel -> (sexp list, string) Result.t
 
   (** {2 Serialising} *)
 
   (** The length of the serialised representation of a S-expression *)
-  val serialised_length : Sexp.t -> int
+  val serialised_length : sexp -> int
 
   (** [to_string sexp] converts S-expression [sexp] to a string in canonical
       form. *)
-  val to_string : Sexp.t -> string
+  val to_string : sexp -> string
 
   (** [to_buffer buf sexp] outputs the S-expression [sexp] converted to its
       canonical form to buffer [buf]. *)
-  val to_buffer : Buffer.t -> Sexp.t -> unit
+  val to_buffer : Buffer.t -> sexp -> unit
 
   (** [output oc sexp] outputs the S-expression [sexp] converted to its
       canonical form to channel [oc]. *)
-  val to_channel : out_channel -> Sexp.t -> unit
+  val to_channel : out_channel -> sexp -> unit
 
   (** {3 Low level parser}
 
@@ -177,7 +178,7 @@ module Make (Sexp : Sexp) : sig
 
         {[
           # Stack.to_list (Sexp (Atom "x", Sexp (List [Atom "y"], Empty)));;
-          - : Sexp.t list = [List [Atom "y"; Atom "x"]]
+          - : sexp list = [List [Atom "y"; Atom "x"]]
         ]}
 
         If instead you want to stop parsing as soon a single full S-expression
@@ -289,7 +290,7 @@ module Make (Sexp : Sexp) : sig
       type t =
         | Empty
         | Open of t
-        | Sexp of Sexp.t * t
+        | Sexp of sexp * t
 
       (** Extract the list of full S-expressions contained in a stack.
 
@@ -301,7 +302,7 @@ module Make (Sexp : Sexp) : sig
           ]}
           @raise Parse_error if the stack contains open parentheses that has not
           been closed. *)
-      val to_list : t -> Sexp.t list
+      val to_list : t -> sexp list
 
       (** Add a left parenthesis. *)
       val open_paren : t -> t
@@ -361,13 +362,15 @@ module Make (Sexp : Sexp) : sig
   [@@@warning "-3"]
 
   module Make_parser (Input : Input) : sig
-    val parse : Input.t -> (Sexp.t, string) Result.t Input.Monad.t
+    val parse : Input.t -> (sexp, string) Result.t Input.Monad.t
 
-    val parse_many : Input.t -> (Sexp.t list, string) Result.t Input.Monad.t
+    val parse_many : Input.t -> (sexp list, string) Result.t Input.Monad.t
   end
   [@@deprecated "Use Parser module instead"]
 end
 
-type t =
-  | Atom of string
-  | List of t list
+module Make (Sexp : Sexp) : S with type sexp := Sexp.t
+
+include Sexp
+
+include S with type sexp := t
