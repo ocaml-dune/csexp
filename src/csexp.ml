@@ -12,6 +12,93 @@ module type Monad = sig
   val bind : 'a t -> ('a -> 'b t) -> 'b t
 end
 
+module type S = sig
+  type sexp
+
+  val parse_string : string -> (sexp, int * string) Result.t
+
+  val parse_string_many : string -> (sexp list, int * string) Result.t
+
+  val input : in_channel -> (sexp, string) Result.t
+
+  val input_opt : in_channel -> (sexp option, string) Result.t
+
+  val input_many : in_channel -> (sexp list, string) Result.t
+
+  val serialised_length : sexp -> int
+
+  val to_string : sexp -> string
+
+  val to_buffer : Buffer.t -> sexp -> unit
+
+  val to_channel : out_channel -> sexp -> unit
+
+  module Parser : sig
+    exception Parse_error of string
+
+    val premature_end_of_input : string
+
+    module Lexer : sig
+      type t
+
+      val create : unit -> t
+
+      type _ token =
+        | Await : [> `other ] token
+        | Lparen : [> `other ] token
+        | Rparen : [> `other ] token
+        | Atom : int -> [> `atom ] token
+
+      val feed : t -> char -> [ `other | `atom ] token
+
+      val feed_eoi : t -> unit
+    end
+
+    module Stack : sig
+      type t =
+        | Empty
+        | Open of t
+        | Sexp of sexp * t
+
+      val to_list : t -> sexp list
+
+      val open_paren : t -> t
+
+      val close_paren : t -> t
+
+      val add_atom : string -> t -> t
+
+      val add_token : [ `other ] Lexer.token -> t -> t
+    end
+  end
+
+  module type Input = sig
+    type t
+
+    module Monad : sig
+      type 'a t
+
+      val return : 'a -> 'a t
+
+      val bind : 'a t -> ('a -> 'b t) -> 'b t
+    end
+
+    val read_string : t -> int -> (string, string) Result.t Monad.t
+
+    val read_char : t -> (char, string) Result.t Monad.t
+  end
+  [@@deprecated "Use Parser module instead"]
+
+  [@@@warning "-3"]
+
+  module Make_parser (Input : Input) : sig
+    val parse : Input.t -> (sexp, string) Result.t Input.Monad.t
+
+    val parse_many : Input.t -> (sexp list, string) Result.t Input.Monad.t
+  end
+  [@@deprecated "Use Parser module instead"]
+end
+
 module Make (Sexp : Sexp) = struct
   open Sexp
 
@@ -331,3 +418,12 @@ module Make (Sexp : Sexp) = struct
       fun input -> loop input (Lexer.create ()) Empty
   end
 end
+
+module T = struct
+  type t =
+    | Atom of string
+    | List of t list
+end
+
+include T
+include Make (T)
