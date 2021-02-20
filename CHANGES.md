@@ -1,3 +1,8 @@
+# 1.4.0
+
+- Add a `Csexp.t` type and extend `Csexp` to include the module from the functor
+  application (#14, @rgrinberg)
+
 # 1.3.2
 
 - The project now builds with dune 1.11.0 and onward (#12, @voodoos)
