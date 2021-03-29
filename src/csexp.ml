@@ -15,15 +15,15 @@ end
 module type S = sig
   type sexp
 
-  val parse_string : string -> (sexp, int * string) Result.t
+  val parse_string : string -> (sexp, int * string) result
 
-  val parse_string_many : string -> (sexp list, int * string) Result.t
+  val parse_string_many : string -> (sexp list, int * string) result
 
-  val input : in_channel -> (sexp, string) Result.t
+  val input : in_channel -> (sexp, string) result
 
-  val input_opt : in_channel -> (sexp option, string) Result.t
+  val input_opt : in_channel -> (sexp option, string) result
 
-  val input_many : in_channel -> (sexp list, string) Result.t
+  val input_many : in_channel -> (sexp list, string) result
 
   val serialised_length : sexp -> int
 
@@ -83,30 +83,24 @@ module type S = sig
       val bind : 'a t -> ('a -> 'b t) -> 'b t
     end
 
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+    val read_string : t -> int -> (string, string) result Monad.t
 
-    val read_char : t -> (char, string) Result.t Monad.t
+    val read_char : t -> (char, string) result Monad.t
   end
   [@@deprecated "Use Parser module instead"]
 
   [@@@warning "-3"]
 
   module Make_parser (Input : Input) : sig
-    val parse : Input.t -> (sexp, string) Result.t Input.Monad.t
+    val parse : Input.t -> (sexp, string) result Input.Monad.t
 
-    val parse_many : Input.t -> (sexp list, string) Result.t Input.Monad.t
+    val parse_many : Input.t -> (sexp list, string) result Input.Monad.t
   end
   [@@deprecated "Use Parser module instead"]
 end
 
 module Make (Sexp : Sexp) = struct
   open Sexp
-
-  (* This is to keep compatibility with 4.02 without writing [Result.]
-     everywhere *)
-  type ('a, 'b) result = ('a, 'b) Result.result =
-    | Ok of 'a
-    | Error of 'b
 
   module Parser = struct
     exception Parse_error of string
@@ -370,9 +364,9 @@ module Make (Sexp : Sexp) = struct
 
     module Monad : Monad
 
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+    val read_string : t -> int -> (string, string) result Monad.t
 
-    val read_char : t -> (char, string) Result.t Monad.t
+    val read_char : t -> (char, string) result Monad.t
   end
 
   module Make_parser (Input : Input) = struct
