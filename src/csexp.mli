@@ -353,18 +353,18 @@ module type S = sig
       val bind : 'a t -> ('a -> 'b t) -> 'b t
     end
 
-    val read_string : t -> int -> (string, string) Result.t Monad.t
+    val read_string : t -> int -> (string, string) result Monad.t
 
-    val read_char : t -> (char, string) Result.t Monad.t
+    val read_char : t -> (char, string) result Monad.t
   end
   [@@deprecated "Use Parser module instead"]
 
   [@@@warning "-3"]
 
   module Make_parser (Input : Input) : sig
-    val parse : Input.t -> (sexp, string) Result.t Input.Monad.t
+    val parse : Input.t -> (sexp, string) result Input.Monad.t
 
-    val parse_many : Input.t -> (sexp list, string) Result.t Input.Monad.t
+    val parse_many : Input.t -> (sexp list, string) result Input.Monad.t
   end
   [@@deprecated "Use Parser module instead"]
 end
