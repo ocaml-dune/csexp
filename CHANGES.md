@@ -1,4 +1,4 @@
-# unreleased
+# 1.5.0
 
 - Drop dependency on result and compatibility with OCaml 4.02 (#17,
   @rgrinberg)
