@@ -34,24 +34,24 @@ module type S = sig
       [s]. It is an error for [s] to contain a S-expression followed by more
       data. In case of error, the offset of the error as well as an error
       message is returned. *)
-  val parse_string : string -> (sexp, int * string) Result.t
+  val parse_string : string -> (sexp, int * string) result
 
   (** [parse_string s] parses a sequence of S-expressions encoded in canonical
       form in [s] *)
-  val parse_string_many : string -> (sexp list, int * string) Result.t
+  val parse_string_many : string -> (sexp list, int * string) result
 
   (** Read exactly one canonical S-expressions from the given channel. Note that
       this function never raises [End_of_file]. Instead, it returns [Error]. *)
-  val input : in_channel -> (sexp, string) Result.t
+  val input : in_channel -> (sexp, string) result
 
   (** Same as [input] but returns [Ok None] if the end of file has already been
       reached. If some more characters are available but the end of file is
       reached before reading a complete S-expression, this function returns
       [Error]. *)
-  val input_opt : in_channel -> (sexp option, string) Result.t
+  val input_opt : in_channel -> (sexp option, string) result
 
   (** Read many S-expressions until the end of input is reached. *)
-  val input_many : in_channel -> (sexp list, string) Result.t
+  val input_many : in_channel -> (sexp list, string) result
 
   (** {2 Serialising} *)
 

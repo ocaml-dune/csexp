@@ -10,8 +10,8 @@ open Csexp
 let roundtrip x =
   let str = to_string x in
   match parse_string str with
-  | Result.Error (_, msg) -> failwith msg
-  | Result.Ok exp ->
+  | Error (_, msg) -> failwith msg
+  | Ok exp ->
     assert (exp = x);
     print_string str
 
