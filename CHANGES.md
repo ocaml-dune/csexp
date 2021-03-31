@@ -1,7 +1,11 @@
-# 1.5.0
+# 1.5.1
 
 - Drop dependency on result and compatibility with OCaml 4.02 (#17,
   @rgrinberg)
+
+# 1.5.0
+
+Replaced by 1.5.1 because of accidentally breaking compat with 4.03.
 
 # 1.4.0
 
