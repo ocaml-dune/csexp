@@ -140,3 +140,29 @@ let%expect_test "parse_string_many - parse a single csexp" =
 let%expect_test "parse_string_many - parse many csexp" =
   parse_many "(3:foo)(3:bar)";
   [%expect {| Ok "(3:foo)"Ok "(3:bar)" |}]
+
+let%expect_test "serialised_length" =
+  let csexp = Sexp.Atom "xxx" in
+  print_endline (Csexp.to_string csexp);
+  print_int (Csexp.serialised_length csexp);
+  [%expect {|
+    3:xxx
+    5 |}];
+  let csexp = Sexp.List [] in
+  print_endline (Csexp.to_string csexp);
+  print_int (Csexp.serialised_length csexp);
+  [%expect {|
+        ()
+        0 |}];
+  let csexp = Sexp.List [ Atom "xxx" ] in
+  print_endline (Csexp.to_string csexp);
+  print_int (Csexp.serialised_length csexp);
+  [%expect {|
+            (3:xxx)
+            5 |}];
+  let csexp = Sexp.List [ Atom "xxx"; Atom "xxx" ] in
+  print_endline (Csexp.to_string csexp);
+  print_int (Csexp.serialised_length csexp);
+  [%expect {|
+    (3:xxx3:xxx)
+    10 |}]
