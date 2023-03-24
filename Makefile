@@ -22,10 +22,10 @@ all-supported-ocaml-versions:
 
 dune-release:
 	dune-release tag
-	dune-release distrib --skip-build --skip-lint --skip-tests -n csexp
+	dune-release distrib --skip-build --skip-lint --skip-tests
 # See https://github.com/ocamllabs/dune-release/issues/206
-	DUNE_RELEASE_DELEGATE=github-dune-release-delegate dune-release publish distrib --verbose -n csexp
-	dune-release opam pkg -n csexp
-	dune-release opam submit -n csexp
+	DUNE_RELEASE_DELEGATE=github-dune-release-delegate dune-release publish distrib --verbose
+	dune-release opam pkg
+	dune-release opam submit
 
 .PHONY: default install uninstall reinstall clean test
