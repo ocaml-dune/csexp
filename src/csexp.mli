@@ -148,7 +148,9 @@ module type S = sig
 
         For instance, the prefix "1:x((1:y1:z)" will be represented as:
 
-        {[ Sexp (List [ Atom "y"; Atom "z" ], Open (Sexp (Atom "x", Empty))) ]}
+        {[
+          Sexp (List [ Atom "y"; Atom "z" ], Open (Sexp (Atom "x", Empty)))
+        ]}
 
         The {!Stack} module offers various primitives to open or close
         parentheses or insert an atom. And for convenience it provides a
@@ -234,8 +236,8 @@ module type S = sig
             let rec loop s pos len lexer stack =
               if pos = len then (
                 Lexer.feed_eoi lexer;
-                Stack.to_list stack
-              ) else
+                Stack.to_list stack)
+              else
                 match Lexer.feed lexer (String.unsafe_get s pos) with
                 | Atom atom_len ->
                   let atom = extract_atom s (pos + 1) atom_len in
@@ -300,8 +302,8 @@ module type S = sig
             # to_list (Sexp (Atom "y", Sexp (Atom "x", Empty)));;
             - : Stack.t list = [Atom "x"; Atom "y"]
           ]}
-          @raise Parse_error if the stack contains open parentheses that has not
-          been closed. *)
+          @raise Parse_error
+            if the stack contains open parentheses that has not been closed. *)
       val to_list : t -> sexp list
 
       (** Add a left parenthesis. *)
