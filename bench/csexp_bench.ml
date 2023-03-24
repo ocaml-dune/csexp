@@ -11,8 +11,7 @@ module Csexp = Csexp.Make (Sexp)
 let atom = Sexp.Atom (String.make 128 'x')
 
 let rec gen_sexp depth =
-  if depth = 0 then
-    atom
+  if depth = 0 then atom
   else
     let x = gen_sexp (depth - 1) in
     List [ x; x ]

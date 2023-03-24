@@ -147,8 +147,7 @@ module Make (Sexp : Sexp) = struct
             parse_error "atom too big to represent"
           else (
             t.n <- len;
-            Await
-          )
+            Await)
         | Parsing_length, ':' ->
           t.state <- Init;
           Atom t.n
@@ -229,11 +228,11 @@ module Make (Sexp : Sexp) = struct
       | exception _ -> Error (len, premature_end_of_input)
       | atom ->
         let pos = pos + 1 + atom_len in
-        k s pos len lexer (Stack.add_atom atom stack) )
+        k s pos len lexer (Stack.add_atom atom stack))
     | (L.Await | L.Lparen | L.Rparen) as x -> (
       match Stack.add_token x stack with
       | exception Parse_error msg -> Error (pos, msg)
-      | stack -> k s (pos + 1) len lexer stack )
+      | stack -> k s (pos + 1) len lexer stack)
     [@@inlined always]
 
   let parse_string =
@@ -242,15 +241,12 @@ module Make (Sexp : Sexp) = struct
         match feed_eoi_single lexer stack with
         | Error msg -> Error (pos, msg)
         | Ok _ as ok -> ok
-      else
-        one_token s pos len lexer stack cont
+      else one_token s pos len lexer stack cont
     and cont s pos len lexer stack =
       match stack with
       | Stack.Sexp (sexp, Empty) ->
-        if pos = len then
-          Ok sexp
-        else
-          Error (pos, "data after canonical S-expression")
+        if pos = len then Ok sexp
+        else Error (pos, "data after canonical S-expression")
       | stack -> loop s pos len lexer stack
     in
     fun s -> loop s 0 (String.length s) (Lexer.create ()) Empty
@@ -261,8 +257,7 @@ module Make (Sexp : Sexp) = struct
         match feed_eoi_many lexer stack with
         | Error msg -> Error (pos, msg)
         | Ok _ as ok -> ok
-      else
-        one_token s pos len lexer stack loop
+      else one_token s pos len lexer stack loop
     in
     fun s -> loop s 0 (String.length s) (Lexer.create ()) Empty
 
@@ -271,7 +266,7 @@ module Make (Sexp : Sexp) = struct
     | L.Atom n -> (
       match really_input_string ic n with
       | exception End_of_file -> raise (Parse_error premature_end_of_input)
-      | s -> Stack.add_atom s stack )
+      | s -> Stack.add_atom s stack)
     | (L.Await | L.Lparen | L.Rparen) as x -> Stack.add_token x stack
 
   let input_opt =
@@ -293,7 +288,7 @@ module Make (Sexp : Sexp) = struct
             loop ic lexer (Stack.add_token x Empty)
         with
         | Parse_error msg -> Error msg
-        | End_of_file -> Error premature_end_of_input )
+        | End_of_file -> Error premature_end_of_input)
 
   let input ic =
     match input_opt ic with
@@ -387,9 +382,9 @@ module Make (Sexp : Sexp) = struct
         return (Ok (Stack.add_atom s stack))
       | (L.Await | L.Lparen | L.Rparen) as x ->
         return
-          ( match Stack.add_token x stack with
+          (match Stack.add_token x stack with
           | exception Parse_error msg -> Error msg
-          | stack -> Ok stack )
+          | stack -> Ok stack)
 
     let parse =
       let rec loop input lexer stack =
@@ -398,7 +393,7 @@ module Make (Sexp : Sexp) = struct
         | Ok c -> (
           one_token input c lexer stack >>=* function
           | Sexp (sexp, Empty) -> return (Ok sexp)
-          | stack -> loop input lexer stack )
+          | stack -> loop input lexer stack)
       in
       fun input -> loop input (Lexer.create ()) Empty
 
