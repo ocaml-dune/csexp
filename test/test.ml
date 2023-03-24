@@ -153,16 +153,16 @@ let%expect_test "serialised_length" =
   print_int (Csexp.serialised_length csexp);
   [%expect {|
         ()
-        0 |}];
+        2 |}];
   let csexp = Sexp.List [ Atom "xxx" ] in
   print_endline (Csexp.to_string csexp);
   print_int (Csexp.serialised_length csexp);
   [%expect {|
             (3:xxx)
-            5 |}];
+            7 |}];
   let csexp = Sexp.List [ Atom "xxx"; Atom "xxx" ] in
   print_endline (Csexp.to_string csexp);
   print_int (Csexp.serialised_length csexp);
   [%expect {|
     (3:xxx3:xxx)
-    10 |}]
+    12 |}]

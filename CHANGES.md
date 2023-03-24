@@ -1,3 +1,8 @@
+# 1.5.2
+
+- Fix `Csexp.serialised_length`. Previously, it would under count by 2 because
+  it did not take the parentheses into account. (#22, @jchavarri)
+
 # 1.5.1
 
 - Drop dependency on result and compatibility with OCaml 4.02 (#17,
